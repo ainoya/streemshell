@@ -1,0 +1,75 @@
+#!/usr/bin/env ruby
+#
+require 'pry'
+require 'shellwords'
+STDIN.sync = true
+
+class CMD
+  @cmd
+  def initialize(cmd)
+    @cmd = cmd
+  end
+
+  def exec(input)
+    `#{@cmd}`
+  end
+end
+# CMD.new("cat hoge.txt").exec => return txt in hoge
+
+class StreemCMD < CMD
+  def initialize(cmd)
+    @streem = "./streem"
+    super
+  end
+
+  def script_file
+    file = Tempfile.create("stream_command")
+    File.write(file.path, ["stdin", @cmd, "stdout"].join("|"))
+    #puts "-----"
+    #puts File.read(file.path)
+    #puts "-----"
+    file
+  end
+
+  def input_file(input)
+    file = Tempfile.create("input_data")
+    File.write(file.path,input)
+    file
+  end
+
+  def exec(input)
+    s_cmd = "#{@streem} #{script_file.path} < #{input_file(input).path}"
+    #puts s_cmd
+    #binding.pry
+    system(s_cmd)
+    #puts `#{s_cmd}`
+  end
+end
+
+
+loop do
+  $stdout.print '-> '
+  line = $stdin.gets.strip
+  #command, *arguments = Shellwords.shellsplit(line)
+  
+  command_list = line.split("|").map do |c|
+    if system("which #{Shellwords.shellsplit(c).first}", out: File::NULL)
+      CMD.new(c)
+    else
+      StreemCMD.new(c)
+    end
+  end
+
+  #puts command_list
+  result_list = command_list.each_with_object([]) do |c, o|
+    #puts c
+    #puts o
+    #binding.pry
+    result = c.exec(o.last)
+    #puts result
+    o << result
+  end
+
+  #puts result_list
+end
+
